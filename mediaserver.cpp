@@ -37,7 +37,7 @@ public:
         this->height = height;
     }
     ~VideoFrame() {
-        delete data;
+        delete[] data;
     }
 };
 
@@ -88,11 +88,7 @@ public:
                             printf("failed to get buffer\n");
                         }
                         AVPixelFormat* formats;
-                        /*av_hwframe_transfer_get_formats(encodeCtx->hw_frames_ctx,AV_HWFRAME_TRANSFER_DIRECTION_TO,&formats,0);
-                        while(*formats != AV_PIX_FMT_NONE) {
-                            printf("Found format: %i\n",*formats);
-                            formats++;
-                        }*/
+
 
                         av_hwframe_map(aframe,hwframe,AV_HWFRAME_MAP_WRITE);
                     }else {
@@ -109,7 +105,7 @@ public:
                     if(hwframe) {
                         av_frame_unref(aframe);
                         avcodec_send_frame(encodeCtx,hwframe);
-
+                        av_frame_free(&hwframe);
                     }else {
                         avcodec_send_frame(encodeCtx,aframe);
                     }
