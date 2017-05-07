@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>171</width>
+    <height>325</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralWidget"/>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>171</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_File">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <widget class="QMenu" name="menu_Status">
+     <property name="title">
+      <string>&amp;Status</string>
+     </property>
+     <addaction name="action_Online"/>
+     <addaction name="actionO_ffline"/>
+     <addaction name="action_Invisible"/>
+    </widget>
+    <addaction name="action_New_contact"/>
+    <addaction name="menu_Status"/>
+   </widget>
+   <widget class="QMenu" name="menu_Tools">
+    <property name="title">
+     <string>&amp;Tools</string>
+    </property>
+    <addaction name="action_Options"/>
+   </widget>
+   <addaction name="menu_File"/>
+   <addaction name="menu_Tools"/>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <action name="actionE_xit">
+   <property name="text">
+    <string>E&amp;xit</string>
+   </property>
+  </action>
+  <action name="action_New_contact">
+   <property name="text">
+    <string>&amp;New contact</string>
+   </property>
+  </action>
+  <action name="action_Online">
+   <property name="text">
+    <string>&amp;Online</string>
+   </property>
+  </action>
+  <action name="actionO_ffline">
+   <property name="text">
+    <string>O&amp;ffline</string>
+   </property>
+  </action>
+  <action name="action_Invisible">
+   <property name="text">
+    <string>&amp;Invisible</string>
+   </property>
+  </action>
+  <action name="action_Add_router">
+   <property name="text">
+    <string>&amp;Add router</string>
+   </property>
+  </action>
+  <action name="action_View_network_status">
+   <property name="text">
+    <string>&amp;View network status</string>
+   </property>
+  </action>
+  <action name="action_Options">
+   <property name="text">
+    <string>&amp;Options</string>
+   </property>
+  </action>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>
