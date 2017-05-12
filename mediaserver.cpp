@@ -41,7 +41,7 @@ public:
     }
 };
 
-class MediaEncoder:public QAbstractVideoSurface {
+class MediaEncoder:public AbstractVideoEncoder {
     Q_OBJECT
 public:
     AVCodecContext* encodeCtx = nullptr;
@@ -113,13 +113,15 @@ public:
                     AVPacket* packet = av_packet_alloc();
                     if(!avcodec_receive_packet(encodeCtx,packet)) {
                         //Got packet?
-                        packetAvailable(packet);
+                        emit packetAvailable(packet);
                     }else {
                         av_packet_free(&packet);
                     }
                     pts+=60;
                 }
             }
+            avcodec_free_context(&encodeCtx);
+            sws_freeContext(scaler);
         });
     }
 
@@ -188,6 +190,9 @@ public:
     }
 
     bool present(const QVideoFrame & _frame) {
+        if(!(_frame.width() > 0 && _frame.height() > 0)) {
+            return false;
+        }
         QVideoFrame frame = _frame;
         std::unique_lock<std::mutex> l(mtx);
         pendingFrames.push(frame);
@@ -195,14 +200,15 @@ public:
         return true;
     }
     ~MediaEncoder() {
-        if(encodeCtx) {
-            avcodec_free_context(&encodeCtx);
-        }
+        running = false;
+        evt.notify_one();
+        encoder->join();
+        delete encoder;
     }
 signals:
     void initialized();
-    void packetAvailable(AVPacket* packet);
 };
+
 
 class MediaDecoder:public QObject {
     Q_OBJECT
@@ -213,6 +219,7 @@ public:
     std::queue<AVPacket*> pendingPackets;
     std::mutex mtx;
     std::condition_variable evt;
+    bool running = true;
     MediaDecoder(AVPixelFormat pixelFormat, int width, int height, QObject* owner = nullptr):QObject(owner) {
         pixelFormat = AV_PIX_FMT_YUV420P;
         decoderThread = new std::thread([=](){
@@ -221,11 +228,15 @@ public:
 
             AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_H264);
 
-            /*while(accel = av_hwaccel_next(accel)) {
+            while(accel = av_hwaccel_next(accel)) {
                 if(accel->id == AV_CODEC_ID_H264 && accel->pix_fmt == AV_PIX_FMT_VAAPI_VLD) {
                     break;
                 }
-            }*/
+
+            }
+            if(!accel) {
+                printf("No HW-accelerated decoder found.\n");
+            }
 
 
             context = avcodec_alloc_context3(codec);
@@ -237,10 +248,13 @@ public:
             context->height = height;
 
             if(accel) {
-                context->hwaccel = accel;
-                av_hwdevice_ctx_create(&context->hw_device_ctx,AV_HWDEVICE_TYPE_VAAPI,0,0,0);
-
-                context->hw_frames_ctx = av_hwframe_ctx_alloc(context->hw_device_ctx);
+                //context->hwaccel = accel;
+               // av_hwdevice_ctx_create(&context->hw_device_ctx,AV_HWDEVICE_TYPE_VAAPI,0,0,0);
+                //context->hwaccel_context = ((AVHWDeviceContext*)context->hw_device_ctx->data)->hwctx;
+                context->pix_fmt = AV_PIX_FMT_QSV;
+               // context->hwaccel = accel;
+                //TODO find hwaccel  (name) == h264_vaapi
+                /*context->hw_frames_ctx = av_hwframe_ctx_alloc(context->hw_device_ctx);
                 AVHWFramesContext* framectx = (AVHWFramesContext*)context->hw_frames_ctx->data; //Why isn't this better documented? It's not really a byte array....
                 //TODO: Will this break on non-Intel CPUs?
                 framectx->format = AV_PIX_FMT_VAAPI_VLD;
@@ -250,16 +264,18 @@ public:
 
                 if(av_hwframe_ctx_init(context->hw_frames_ctx)) {
                     printf("Failed to start decoder\n");
-                }
+                }*/
 
             }
             avcodec_open2(context,context->codec,0);
+
+            printf("Decode: Using hwaccel %p\n",context->hwaccel);
             scaler = sws_getContext(width,height,pixelFormat,width,height,AV_PIX_FMT_RGBA,SWS_BICUBIC,0,0,0);
 
 
-            while(true) {
+            while(running) {
                 std::unique_lock<std::mutex> l(mtx);
-                while(!pendingPackets.size()) {
+                while(!pendingPackets.size() && running) {
                     evt.wait(l);
                 }
                 std::queue<AVPacket*> packets = pendingPackets;
@@ -283,9 +299,25 @@ public:
                 av_packet_free(&packet);
                 }
             }
+
+            std::unique_lock<std::mutex> l(mtx);
+            while(pendingPackets.size()) {
+                AVPacket* packet = pendingPackets.front();
+                pendingPackets.pop();
+                av_packet_free(&packet);
+                sws_freeContext(scaler);
+                avcodec_free_context(&context);
+            }
         });
 
     }
+    ~MediaDecoder() {
+        running = false;
+        evt.notify_one();
+        decoderThread->join();
+        delete decoderThread;
+    }
+
 public slots:
     void injectPacket(AVPacket* packet) {
         std::unique_lock<std::mutex> l(mtx);
@@ -334,7 +366,7 @@ public slots:
     }
 };
 
-QAbstractVideoSurface* MediaServer::createEncoder() {
+AbstractVideoEncoder* MediaServer::createEncoder() {
     return new MediaEncoder();
 }
 

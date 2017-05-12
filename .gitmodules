@@ -1,0 +1,3 @@
+[submodule "cppext"]
+	path = cppext
+	url = https://github.com/IDWMaster/cppext

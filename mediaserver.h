@@ -4,10 +4,21 @@
 #include <QObject>
 #include <QWidget>
 #include <QAbstractVideoSurface>
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
 
 class AbstractVideoFrame:public QObject {
     Q_OBJECT
 public:
+};
+
+class AbstractVideoEncoder:public QAbstractVideoSurface {
+    Q_OBJECT
+public:
+signals:
+    void packetAvailable(AVPacket* packet);
+
 };
 
 class AbstractMediaPlayer:public QWidget {
@@ -25,7 +36,7 @@ class MediaServer : public QObject
 public:
     explicit MediaServer(QObject *parent = 0);
     AbstractMediaPlayer* createMediaPlayer();
-    QAbstractVideoSurface* createEncoder();
+    AbstractVideoEncoder* createEncoder();
 signals:
 
 public slots:
