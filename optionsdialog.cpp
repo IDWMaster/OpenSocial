@@ -8,6 +8,9 @@
 #include "mediaserver.h"
 #include "cppext/cppext.h"
 #include <thread>
+#include <unistd.h>
+#include <queue>
+#include <mutex>
 
 //Tester for network streaming
 
@@ -22,11 +25,15 @@ public:
 
 class TestNetworkSender {
 public:
+    std::mutex mtx;
     std::thread* dispatcher;
     std::shared_ptr<System::MessageQueue> dispatcherQueue;
     std::shared_ptr<System::Net::UDPSocket> client;
     System::Net::IPEndpoint ep;
+
+    uint16_t pid; //Packet id -- NOT pid
     TestNetworkSender() {
+        pid = 0;
         client = System::Net::CreateUDPSocket();
         ep.ip = "::ffff:192.168.0.4";
         //ep.ip = "fe80::26df:6aff:fe00:201";
@@ -64,7 +71,32 @@ OptionsDialog::OptionsDialog(QWidget *parent) :
     AbstractMediaPlayer* player = getMediaServer()->createMediaPlayer();
     connect(surface,&AbstractVideoEncoder::packetAvailable,[=](AVPacket* packet){
         //printf("Got packet?\n");
-        net.client->Send(packet->data,packet->size,net.ep);
+        //Packet ID (short) -- Total length (int) -- Segment ID (short) -- Segment size (byte)
+        size_t toSend = packet->size;
+        uint16_t segid = 0;
+        unsigned char segsize = 10; //1024 (1 << 10)
+        size_t offset = 0;
+        size_t maxlen = 1 << (size_t)segsize;
+        while(toSend) {
+            size_t plen = toSend > maxlen ? maxlen : toSend;
+            unsigned char* mander = new unsigned char[2+4+2+1+plen];
+            unsigned char* ptr = mander;
+            memcpy(ptr,&net.pid,2);
+            ptr+=2;
+            memcpy(ptr,&packet->size,4);
+            ptr+=4;
+            memcpy(ptr,&segid,2);
+            ptr+=2;
+            *ptr = segsize;
+            ptr++;
+            memcpy(ptr,packet->data+offset,plen);
+            offset+=plen;
+            net.client->Send(mander,2+4+2+1+plen,net.ep);
+            toSend-=plen;
+            segid++;
+            delete[] mander;
+        }
+        net.pid++;
         av_packet_free(&packet);
     });
     //player->attachEncoder(surface);
