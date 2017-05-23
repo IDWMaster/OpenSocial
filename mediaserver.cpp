@@ -75,7 +75,7 @@ public:
                     }
                     AVFrame* aframe = av_frame_alloc();
                     AVFrame* hwframe = 0;
-                    aframe->pts = pts;
+                    aframe->pts = ((double)frame.startTime()/1000.0/1000.0)*60.0;
                     aframe->width = frame.width();
                     aframe->height = frame.height();
                     aframe->format = format;
@@ -84,6 +84,7 @@ public:
                         //Hardware encoder; special allocation
                         hwframe = av_frame_alloc();
                         hwframe->format = aframe->format;
+                         hwframe->pts = aframe->pts;
                         if(av_hwframe_get_buffer(encodeCtx->hw_frames_ctx,hwframe,0)) {
                             printf("failed to get buffer\n");
                         }
@@ -91,6 +92,7 @@ public:
 
 
                         av_hwframe_map(aframe,hwframe,AV_HWFRAME_MAP_WRITE);
+
                     }else {
                        av_frame_get_buffer(aframe,0);
                     }
@@ -194,6 +196,8 @@ public:
             return false;
         }
         QVideoFrame frame = _frame;
+        int64_t startTime = frame.startTime();
+        int64_t endTime = frame.endTime();
         std::unique_lock<std::mutex> l(mtx);
         pendingFrames.push(frame);
         evt.notify_one();
