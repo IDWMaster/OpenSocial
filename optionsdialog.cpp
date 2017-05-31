@@ -48,6 +48,7 @@ public:
             System::Enter();
         });
         netThread = new std::thread([=](){
+            size_t packetCount = 0;
            while(1) {
                std::unique_lock<std::mutex> l(mtx);
                std::queue<AVPacket*> packets;
@@ -67,7 +68,7 @@ public:
                    goto velociraptor;
                }
                AVPacket* p = pendingPackets.front();
-               printf("%i\n",(int)p->pts);
+
                total+=p->size;
                packets.push(p);
                pendingPackets.pop();
@@ -76,11 +77,10 @@ public:
                }
                duration = p->pts-pts;
                l.unlock();
-               duration = (int64_t)((((double)duration)/60.0)*1000.0*1000.0);
+               duration = (int64_t)((((double)duration)/60.0));
+              // duration = 1000*30;
 
-
-
-               unsigned char segsize = 10; //1024 (1 << 10)
+               unsigned char segsize = 9; //1024 (1 << 10)
                size_t maxlen = 1 << (size_t)segsize;
                size_t numSegments = total/maxlen;
 
@@ -88,6 +88,7 @@ public:
                    numSegments = 1;
                }
                 duration/=numSegments;
+                printf("Duration == %i\n",(int)duration);
 
                while(packets.size()) {
 
@@ -110,7 +111,11 @@ public:
                    ptr++;
                    memcpy(ptr,packet->data+offset,plen);
                    offset+=plen;
+
                    client->Send(mander,2+4+2+1+plen,ep);
+                   if(duration) {
+                   usleep(duration);
+                   }
                    toSend-=plen;
                    segid++;
                    delete[] mander;
